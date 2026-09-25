@@ -74,13 +74,13 @@ export async function getPaymentsForMonth(monthYear: string): Promise<PaymentRow
     student_id: s.id,
     first_name: s.first_name,
     last_name:  s.last_name,
-    groups: (s.student_groups ?? []).map((sg: {
-      weekly_sessions: number;
-      groups: { name: string } | null;
-    }) => ({
-      name:            sg.groups?.name ?? '?',
-      weekly_sessions: sg.weekly_sessions,
-    })),
+    groups: (s.student_groups ?? []).map((sg: any) => {
+      const groupData = Array.isArray(sg.groups) ? sg.groups[0] : sg.groups;
+      return {
+        name:            groupData?.name ?? '?',
+        weekly_sessions: sg.weekly_sessions,
+      };
+    }),
     payment: paymentsMap.get(s.id) ?? null,
   }));
 }
