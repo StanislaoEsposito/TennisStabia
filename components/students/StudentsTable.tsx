@@ -67,7 +67,7 @@ export default function StudentsTable({ students, groups }: StudentsTableProps) 
 
       {/* Tabella desktop */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[800px] w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-4 py-4 text-left font-semibold text-slate-600 uppercase text-xs tracking-wider">Cognome</th>

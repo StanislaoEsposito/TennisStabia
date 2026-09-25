@@ -16,21 +16,21 @@ export default function NavBar() {
 
   return (
     <nav className="sticky top-0 z-50 bg-green-800 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-2 md:px-4 h-20 flex items-center justify-between gap-4">
         {/* Logo */}
-        <span className="flex items-center text-white font-bold text-base sm:text-lg leading-tight">
+        <div className="flex items-center text-white font-bold text-base sm:text-lg leading-tight shrink-0">
           <Image 
             src="/web-app-manifest-192x192.png" 
             alt="Logo" 
             width={56} 
             height={56} 
-            className="mr-3 rounded-full bg-white p-1 shadow-sm" 
+            className="rounded-full bg-white p-1 shadow-sm" 
           />
-          <span><span className="hidden sm:inline">ASD Tennis Club </span>Terme di Stabia</span>
-        </span>
+          <span className="hidden md:block ml-3">ASD Tennis Club Terme di Stabia</span>
+        </div>
 
-        {/* Navigation links */}
-        <div className="flex gap-1 sm:gap-2">
+        {/* Navigation links (scrollabili orizzontalmente su mobile) */}
+        <div className="flex overflow-x-auto whitespace-nowrap gap-2 w-full md:w-auto md:justify-end items-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {links.map(({ href, label, shortLabel }) => {
             const active = pathname.startsWith(href);
             return (

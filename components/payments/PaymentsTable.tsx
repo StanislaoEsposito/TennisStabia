@@ -55,7 +55,7 @@ export default function PaymentsTable({ rows, monthYear }: PaymentsTableProps) {
 
       {/* Tabella */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[800px] w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Allievo</th>
