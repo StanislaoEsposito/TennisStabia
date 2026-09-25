@@ -53,7 +53,7 @@ function TrashIcon() {
 export default function StudentsTable({ students, groups }: StudentsTableProps) {
   const [search, setSearch]         = useState('');
   const [isPending, startTransition] = useTransition();
-  const [editStudent, setEditStudent] = useState<Student | null>(null);
+  const [editStudent, setEditStudent] = useState<StudentRow | null>(null);
 
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
@@ -77,14 +77,7 @@ export default function StudentsTable({ students, groups }: StudentsTableProps) 
   }
 
   function openEdit(student: StudentRow) {
-    setEditStudent({
-      id:                  student.id,
-      first_name:          student.first_name,
-      last_name:           student.last_name,
-      phone_number:        student.phone_number,
-      medical_cert_expiry: student.medical_cert_expiry,
-      created_at:          student.created_at,
-    });
+    setEditStudent(student);
   }
 
   return (
@@ -267,6 +260,7 @@ export default function StudentsTable({ students, groups }: StudentsTableProps) 
       {editStudent && (
         <EditStudentModal
           student={editStudent}
+          groups={groups}
           onClose={() => setEditStudent(null)}
         />
       )}

@@ -39,7 +39,7 @@ export default function AddStudentModal({ groups, onClose }: AddStudentModalProp
           lastName:          String(fd.get('last_name') ?? '').trim(),
           phone:             String(fd.get('phone') ?? '').trim(),
           medicalCertExpiry: String(fd.get('cert_expiry') ?? '').trim(),
-          groupId:           String(fd.get('group_id') ?? '') || undefined,
+          groupIds:          fd.getAll('group_ids').map(String),
           weeklySessions:    Number(fd.get('weekly_sessions') ?? 2),
         });
         toast.success('Allievo aggiunto con successo!');
@@ -116,19 +116,35 @@ export default function AddStudentModal({ groups, onClose }: AddStudentModalProp
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Gruppo</label>
-              <select name="group_id" className="input">
-                <option value="">— Nessuno —</option>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="label mb-2">Gruppi</label>
+              <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                {groups.length === 0 && (
+                  <p className="text-xs text-gray-500 italic">Nessun gruppo disponibile.</p>
+                )}
                 {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                    {g.schedule_description ? ` (${g.schedule_description})` : ''}
-                  </option>
+                  <label key={g.id} className="flex items-start gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      name="group_ids"
+                      value={g.id}
+                      className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500 transition-colors"
+                    />
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+                        {g.name}
+                      </span>
+                      {g.schedule_data && g.schedule_data.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {g.schedule_data.map((s) => `${s.day.slice(0,3)} ${s.time}`).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <label className="label">Sess./settimana</label>
               <input
                 name="weekly_sessions"
@@ -138,6 +154,7 @@ export default function AddStudentModal({ groups, onClose }: AddStudentModalProp
                 defaultValue={2}
                 className="input"
               />
+              <p className="text-xs text-gray-400 mt-1">Applica a tutti i gruppi scelti</p>
             </div>
           </div>
 
@@ -156,7 +173,7 @@ export default function AddStudentModal({ groups, onClose }: AddStudentModalProp
               className="btn-primary flex-1 justify-center"
             >
               {isPending ? (
-                <span className="animate-spin">⟳</span>
+                <span className="animate-spin mr-1">⟳</span>
               ) : null}
               {isPending ? 'Salvataggio…' : 'Salva Allievo'}
             </button>

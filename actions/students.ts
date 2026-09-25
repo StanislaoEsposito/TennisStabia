@@ -60,14 +60,14 @@ export async function getStudentsByGroup(groupId: string) {
 }
 
 /**
- * Crea un nuovo studente e opzionalmente lo assegna a un gruppo.
+ * Crea un nuovo studente e lo assegna a uno o più gruppi.
  */
 export async function createStudent(formData: {
   firstName: string;
   lastName: string;
   phone: string;
   medicalCertExpiry: string;
-  groupId?: string;
+  groupIds?: string[];
   weeklySessions?: number;
 }) {
   const supabase = createClient();
@@ -86,13 +86,15 @@ export async function createStudent(formData: {
 
   if (studentError) throw new Error(studentError.message);
 
-  // 2. Se specificato, assegna al gruppo
-  if (formData.groupId && student) {
-    const { error: groupError } = await supabase.from('student_groups').insert({
+  // 2. Se specificati, assegna ai gruppi
+  if (formData.groupIds && formData.groupIds.length > 0 && student) {
+    const records = formData.groupIds.map((groupId) => ({
       student_id: student.id,
-      group_id: formData.groupId,
+      group_id: groupId,
       weekly_sessions: formData.weeklySessions ?? 2,
-    });
+    }));
+
+    const { error: groupError } = await supabase.from('student_groups').insert(records);
 
     if (groupError) throw new Error(groupError.message);
   }
@@ -115,8 +117,7 @@ export async function deleteStudent(studentId: string) {
 }
 
 /**
- * Aggiorna i dati anagrafici di uno studente esistente.
- * Accetta un oggetto plain (non FormData) per compatibilità con useTransition nei Client Components.
+ * Aggiorna i dati anagrafici di uno studente e i suoi gruppi.
  */
 export async function updateStudent(
   id: string,
@@ -125,10 +126,13 @@ export async function updateStudent(
     lastName: string;
     phone: string;
     medicalCertExpiry: string;
+    groupIds?: string[];
+    weeklySessions?: number;
   }
 ) {
   const supabase = createClient();
 
+  // 1. Aggiorna l'anagrafica
   const { error } = await supabase
     .from('students')
     .update({
@@ -141,7 +145,24 @@ export async function updateStudent(
 
   if (error) throw new Error(error.message);
 
-  // Invalida sia la dashboard che il root (copertura totale dei path con presenze)
+  // 2. Aggiorna i gruppi (sostituzione completa)
+  if (payload.groupIds) {
+    // Rimuovi tutti i gruppi attuali
+    await supabase.from('student_groups').delete().eq('student_id', id);
+
+    // Inserisci i nuovi gruppi
+    if (payload.groupIds.length > 0) {
+      const records = payload.groupIds.map((groupId) => ({
+        student_id: id,
+        group_id: groupId,
+        weekly_sessions: payload.weeklySessions ?? 2,
+      }));
+      const { error: groupError } = await supabase.from('student_groups').insert(records);
+      if (groupError) throw new Error(groupError.message);
+    }
+  }
+
+  // Invalida sia la dashboard che il root
   revalidatePath('/');
   revalidatePath('/dashboard');
 }
