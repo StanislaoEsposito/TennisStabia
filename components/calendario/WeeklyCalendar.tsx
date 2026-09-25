@@ -61,7 +61,7 @@ export default function WeeklyCalendar({ groups }: WeeklyCalendarProps) {
 
   // Ordina secondo l'ordine canonico
   const columns = DAY_ORDER.filter((d) => usedDays.has(d));
-  const rows    = [...usedTimes].sort(); // ordinamento lessicografico funziona per HH:MM
+  const rows    = Array.from(usedTimes).sort(); // ordinamento lessicografico funziona per HH:MM
 
   // Mappa  "giorno|orario" → lista di gruppi in quella cella
   const cellMap = new Map<string, { group: Group; color: string }[]>();
