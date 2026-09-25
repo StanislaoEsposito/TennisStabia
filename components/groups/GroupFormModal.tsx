@@ -2,10 +2,11 @@
 
 import { useTransition, useRef, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { createGroup } from '@/actions/groups';
-import type { ScheduleSlot } from '@/lib/types';
+import { createGroup, updateGroup } from '@/actions/groups';
+import type { Group, ScheduleSlot } from '@/lib/types';
 
-interface AddGroupModalProps {
+interface GroupFormModalProps {
+  group?: Group;
   onClose: () => void;
 }
 
@@ -25,12 +26,21 @@ const DEFAULT_TIME = '15:00';
 
 // ── Componente principale ─────────────────────────────────────
 
-export default function AddGroupModal({ onClose }: AddGroupModalProps) {
+export default function GroupFormModal({ group, onClose }: GroupFormModalProps) {
+  const isEditing = !!group;
   const [isPending, startTransition] = useTransition();
   const nameRef = useRef<HTMLInputElement>(null);
 
-  // Stato: Record<Day, orario selezionato> — solo i giorni attivi sono presenti
-  const [schedule, setSchedule] = useState<Partial<Record<Day, string>>>({});
+  // Inizializza lo stato con i dati del gruppo se in modifica
+  const initialSchedule = group?.schedule_data
+    ? group.schedule_data.reduce((acc, slot) => {
+        acc[slot.day as Day] = slot.time;
+        return acc;
+      }, {} as Partial<Record<Day, string>>)
+    : {};
+
+  const [schedule, setSchedule] = useState<Partial<Record<Day, string>>>(initialSchedule);
+  const [name, setName] = useState(group?.name ?? '');
 
   // Focus sul primo campo all'apertura
   useEffect(() => {
@@ -65,10 +75,9 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = e.currentTarget;
-    const name = (new FormData(form).get('name') as string).trim();
+    const finalName = name.trim();
 
-    if (!name) {
+    if (!finalName) {
       toast.error('Il nome del gruppo è obbligatorio');
       return;
     }
@@ -80,8 +89,13 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
 
     startTransition(async () => {
       try {
-        await createGroup({ name, schedule_data });
-        toast.success(`✅ Gruppo "${name.toUpperCase()}" creato!`);
+        if (isEditing) {
+          await updateGroup(group.id, { name: finalName, schedule_data });
+          toast.success(`✅ Gruppo "${finalName.toUpperCase()}" aggiornato!`);
+        } else {
+          await createGroup({ name: finalName, schedule_data });
+          toast.success(`✅ Gruppo "${finalName.toUpperCase()}" creato!`);
+        }
         onClose();
       } catch (err) {
         toast.error('Errore: ' + (err instanceof Error ? err.message : 'Riprova'));
@@ -104,7 +118,9 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <h2 className="text-lg font-bold text-slate-900">🎾 Nuovo Gruppo</h2>
+          <h2 className="text-lg font-bold text-slate-900">
+            {isEditing ? '✏️ Modifica Gruppo' : '🎾 Nuovo Gruppo'}
+          </h2>
           <button
             onClick={onClose}
             disabled={isPending}
@@ -119,7 +135,7 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
 
         {/* Body scrollabile */}
         <div className="overflow-y-auto flex-1">
-          <form id="add-group-form" onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <form id="group-form" onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
 
             {/* ── Nome ── */}
             <div>
@@ -132,6 +148,8 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
                 name="name"
                 type="text"
                 required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="es. NADAL"
                 className="input"
                 disabled={isPending}
@@ -211,11 +229,11 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
           </button>
           <button
             type="submit"
-            form="add-group-form"
+            form="group-form"
             disabled={isPending}
             className="btn-primary flex-1"
           >
-            {isPending ? 'Salvataggio…' : '✅ Crea Gruppo'}
+            {isPending ? 'Salvataggio…' : (isEditing ? '✅ Salva Modifiche' : '✅ Crea Gruppo')}
           </button>
         </div>
       </div>

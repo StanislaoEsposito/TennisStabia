@@ -66,6 +66,32 @@ export async function createGroup(payload: {
   revalidatePath('/dashboard');
 }
 
+export async function updateGroup(id: string, payload: {
+  name: string;
+  schedule_data: ScheduleSlot[];
+}) {
+  const supabase = createClient();
+
+  const description = payload.schedule_data.length > 0
+    ? slotsToDescription(payload.schedule_data)
+    : null;
+
+  const { error } = await supabase
+    .from('groups')
+    .update({
+      name:                 payload.name.trim().toUpperCase(),
+      schedule_data:        payload.schedule_data,
+      schedule_description: description,
+    })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/gruppi');
+  revalidatePath('/calendario');
+  revalidatePath('/dashboard');
+}
+
 export async function deleteGroup(id: string) {
   const supabase = createClient();
 

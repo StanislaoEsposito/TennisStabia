@@ -79,18 +79,18 @@ export default function WeeklyCalendar({ groups }: WeeklyCalendarProps) {
 
   return (
     <div className="space-y-6">
-      {/* Griglia */}
+      {/* Griglia — scrollabile orizzontalmente su mobile */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full text-sm border-collapse">
+        <table className="min-w-[700px] w-full text-sm border-collapse">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold text-slate-500 w-20 text-xs uppercase tracking-wider">
+              <th className="px-4 py-3 text-left font-semibold text-slate-500 w-20 text-xs uppercase tracking-wider sticky left-0 bg-slate-50 z-10">
                 Ora
               </th>
               {columns.map((day) => (
                 <th
                   key={day}
-                  className="px-4 py-3 text-center font-semibold text-slate-700 min-w-[130px] text-xs uppercase tracking-wider"
+                  className="px-4 py-3 text-center font-semibold text-slate-700 min-w-[120px] text-xs uppercase tracking-wider"
                 >
                   {day}
                 </th>
@@ -100,8 +100,8 @@ export default function WeeklyCalendar({ groups }: WeeklyCalendarProps) {
           <tbody className="divide-y divide-slate-100">
             {rows.map((time) => (
               <tr key={time} className="hover:bg-slate-50/60 transition-colors">
-                {/* Colonna ora */}
-                <td className="px-4 py-3 font-mono text-slate-500 font-semibold text-sm align-top whitespace-nowrap">
+                {/* Colonna ora — sticky a sinistra su mobile */}
+                <td className="px-4 py-3 font-mono text-slate-500 font-semibold text-sm align-top whitespace-nowrap sticky left-0 bg-white z-10 border-r border-slate-100">
                   {time}
                 </td>
 

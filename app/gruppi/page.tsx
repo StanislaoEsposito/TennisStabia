@@ -2,13 +2,22 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import AddGroupModal from '@/components/groups/AddGroupModal';
+import GroupFormModal from '@/components/groups/GroupFormModal';
 import { getGroups, deleteGroup } from '@/actions/groups';
 import type { Group } from '@/lib/types';
 
+function PencilIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+    </svg>
+  );
+}
+
 export default function GruppiPage() {
   const [groups, setGroups] = useState<Group[]>([]);
-  const [showModal, setShowModal] = useState(false);
+  const [modalState, setModalState] = useState<{ open: boolean; group?: Group }>({ open: false });
   const [isPending, startTransition] = useTransition();
 
   // Carica i gruppi
@@ -51,7 +60,7 @@ export default function GruppiPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setModalState({ open: true })}
           className="btn-primary self-start sm:self-auto"
         >
           + Nuovo Gruppo
@@ -102,29 +111,39 @@ export default function GruppiPage() {
               </div>
 
               {/* Azioni */}
-              <button
-                onClick={() => handleDelete(group)}
-                disabled={isPending}
-                aria-label={`Elimina gruppo ${group.name}`}
-                className="flex-shrink-0 p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
-              >
-                {/* Trash icon */}
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setModalState({ open: true, group })}
+                  disabled={isPending}
+                  aria-label={`Modifica gruppo ${group.name}`}
+                  className="flex-shrink-0 p-2 rounded-lg text-blue-500 hover:bg-blue-50 hover:text-blue-600 transition-colors disabled:opacity-40"
+                >
+                  <PencilIcon />
+                </button>
+                <button
+                  onClick={() => handleDelete(group)}
+                  disabled={isPending}
+                  aria-label={`Elimina gruppo ${group.name}`}
+                  className="flex-shrink-0 p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {/* Modal */}
-      {showModal && (
-        <AddGroupModal
+      {modalState.open && (
+        <GroupFormModal
+          group={modalState.group}
           onClose={() => {
-            setShowModal(false);
-            loadGroups(); // Ricarica dopo la creazione
+            setModalState({ open: false });
+            loadGroups(); // Ricarica dopo creazione/modifica
           }}
         />
       )}
