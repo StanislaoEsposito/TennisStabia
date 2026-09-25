@@ -11,10 +11,17 @@ export type Student = {
   created_at: string;
 };
 
+/** Un singolo slot orario strutturato (salvato in schedule_data JSONB) */
+export type ScheduleSlot = {
+  day: string;  // es. 'Lunedì', 'Martedì'…
+  time: string; // es. '15:00', '16:30'
+};
+
 export type Group = {
   id: string;
   name: string;
-  schedule_description: string | null;
+  schedule_description: string | null; // legacy — mantenuto per compatibilità
+  schedule_data: ScheduleSlot[] | null; // nuovo — campo strutturato JSONB
   created_at: string;
 };
 

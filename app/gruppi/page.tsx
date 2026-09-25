@@ -82,10 +82,21 @@ export default function GruppiPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-slate-900 text-base">{group.name}</p>
-                  {group.schedule_description ? (
-                    <p className="text-sm text-slate-500 truncate">{group.schedule_description}</p>
+                  {group.schedule_data && group.schedule_data.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {group.schedule_data.map((slot, i) => (
+                        <span
+                          key={i}
+                          className="inline-block rounded-md bg-green-50 border border-green-200 px-2 py-0.5 text-xs text-green-800 font-medium"
+                        >
+                          {slot.day.slice(0, 3)} {slot.time}
+                        </span>
+                      ))}
+                    </div>
+                  ) : group.schedule_description ? (
+                    <p className="text-sm text-slate-500 truncate mt-0.5">{group.schedule_description}</p>
                   ) : (
-                    <p className="text-sm text-slate-300 italic">Nessun orario impostato</p>
+                    <p className="text-sm text-slate-300 italic mt-0.5">Nessun orario impostato</p>
                   )}
                 </div>
               </div>

@@ -1,220 +1,176 @@
 'use client';
 
-import type { Group } from '@/lib/types';
+import type { Group, ScheduleSlot } from '@/lib/types';
 
-// ── Parsing schedule_description ─────────────────────────────────────────────
-//
-// Esempi reali del campo:
-//   'H 15:00 Lun-Merc'   → ore 15, giorni Lunedì e Mercoledì
-//   'H 16 LUN-MERC'      → ore 16, giorni Lunedì e Mercoledì
-//   'H 09:00 Sab'        → ore 9, solo Sabato
-//   'H 11:00 Dom'        → ore 11, solo Domenica
-//
-// La funzione restituisce { hour: number, days: DayKey[] }
+// ── Costanti ─────────────────────────────────────────────────
 
-export type DayKey = 'lun' | 'mar' | 'mer' | 'gio' | 'ven' | 'sab' | 'dom';
+/** Ordine canonico dei giorni per le colonne */
+const DAY_ORDER = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
-const DAY_LABELS: Record<DayKey, string> = {
-  lun: 'Lunedì',
-  mar: 'Martedì',
-  mer: 'Mercoledì',
-  gio: 'Giovedì',
-  ven: 'Venerdì',
-  sab: 'Sabato',
-  dom: 'Domenica',
-};
+/** Colori ciclici per i badge dei gruppi */
+const GROUP_COLORS = [
+  'bg-green-100  text-green-800  border-green-300',
+  'bg-blue-100   text-blue-800   border-blue-300',
+  'bg-purple-100 text-purple-800 border-purple-300',
+  'bg-orange-100 text-orange-800 border-orange-300',
+  'bg-pink-100   text-pink-800   border-pink-300',
+  'bg-teal-100   text-teal-800   border-teal-300',
+  'bg-yellow-100 text-yellow-800 border-yellow-300',
+];
 
-/** Mappa token → DayKey (case-insensitive, plurali e singolari) */
-const TOKEN_TO_DAY: Record<string, DayKey> = {
-  lun: 'lun', luns: 'lun', lunedì: 'lun', lunedi: 'lun',
-  mar: 'mar', mars: 'mar', mart: 'mar', martedì: 'mar', martedi: 'mar',
-  mer: 'mer', mers: 'mer', merc: 'mer', mercoledì: 'mer', mercoledi: 'mer',
-  gio: 'gio', gios: 'gio', giov: 'gio', giovedì: 'gio', giovedi: 'gio',
-  ven: 'ven', vens: 'ven', venerdì: 'ven', venerdi: 'ven',
-  sab: 'sab', sabs: 'sab', sabato: 'sab',
-  dom: 'dom', doms: 'dom', domenica: 'dom',
-};
-
-const DAY_ORDER: DayKey[] = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
-
-type ParsedSchedule = {
-  hour: number;
-  days: DayKey[];
-};
-
-export function parseSchedule(desc: string | null): ParsedSchedule | null {
-  if (!desc) return null;
-
-  // Estrai l'ora: cerca pattern come "15", "15:00", "9"
-  const hourMatch = desc.match(/\b(\d{1,2})(?::\d{2})?\b/);
-  if (!hourMatch) return null;
-  const hour = parseInt(hourMatch[1], 10);
-
-  // Rimuovi la parte dell'ora e il prefisso "H" per tenere solo i giorni
-  const withoutHour = desc.replace(/\bH\b/i, '').replace(hourMatch[0], '').trim();
-
-  // Dividi per spazi, virgole, trattini (es. 'Lun-Merc' diventa ['Lun', 'Merc'])
-  const tokens = withoutHour.split(/[\s,\-]+/).filter(Boolean);
-  
-  const days: DayKey[] = [];
-  for (const tok of tokens) {
-    const day = TOKEN_TO_DAY[tok.toLowerCase()];
-    if (day && !days.includes(day)) {
-      days.push(day);
-    }
-  }
-
-  if (days.length === 0) return null;
-  return { hour, days };
-}
-
-// ── Componente ────────────────────────────────────────────────────────────────
+// ── Componente ────────────────────────────────────────────────
 
 interface WeeklyCalendarProps {
   groups: Group[];
 }
 
-/** Colori ciclici per i gruppi */
-const GROUP_COLORS = [
-  'bg-green-100 text-green-800 border-green-300',
-  'bg-blue-100  text-blue-800  border-blue-300',
-  'bg-purple-100 text-purple-800 border-purple-300',
-  'bg-orange-100 text-orange-800 border-orange-300',
-  'bg-pink-100  text-pink-800  border-pink-300',
-  'bg-teal-100  text-teal-800  border-teal-300',
-  'bg-yellow-100 text-yellow-800 border-yellow-300',
-];
-
 export default function WeeklyCalendar({ groups }: WeeklyCalendarProps) {
-  // Calcola le ore usate (min e max) per determinare le righe della griglia
-  const parsed = groups.map((g, i) => ({
-    group:  g,
-    sched:  parseSchedule(g.schedule_description),
-    color:  GROUP_COLORS[i % GROUP_COLORS.length],
-  }));
+  // Separa i gruppi con schedule_data strutturato da quelli senza
+  const withData    = groups.filter((g) => g.schedule_data && g.schedule_data.length > 0);
+  const withoutData = groups.filter((g) => !g.schedule_data || g.schedule_data.length === 0);
 
-  const usedHours = parsed
-    .map((p) => p.sched?.hour)
-    .filter((h): h is number => h !== undefined);
+  if (withData.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-5 py-6 text-center">
+          <p className="text-2xl mb-2">📅</p>
+          <p className="text-sm font-medium text-yellow-800">
+            Nessun gruppo ha ancora un orario strutturato.
+          </p>
+          <p className="text-xs text-yellow-600 mt-1">
+            Vai in <strong>Gruppi</strong> e crea o aggiorna i tuoi gruppi con il selettore giorni/orari.
+          </p>
+        </div>
+        {withoutData.length > 0 && <LegacyWarning groups={withoutData} />}
+      </div>
+    );
+  }
 
-  const minHour = usedHours.length > 0 ? Math.min(...usedHours) : 9;
-  const maxHour = usedHours.length > 0 ? Math.max(...usedHours) : 18;
-  const hours = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i);
+  // ── Costruzione della griglia ─────────────────────────────
 
-  // Colonne: solo i giorni della settimana che compaiono effettivamente
-  const usedDays = new Set(parsed.flatMap((p) => p.sched?.days ?? []));
-  const columns: DayKey[] = DAY_ORDER.filter((d) => usedDays.has(d));
+  // Raccoglie tutti i giorni e gli orari unici presenti nei dati
+  const usedDays  = new Set<string>();
+  const usedTimes = new Set<string>();
 
-  // Mappa: `${hour}-${day}` → gruppi
-  type CellKey = string;
-  const cellMap = new Map<CellKey, typeof parsed>();
-  for (const item of parsed) {
-    if (!item.sched) continue;
-    for (const day of item.sched.days) {
-      const key: CellKey = `${item.sched.hour}-${day}`;
-      if (!cellMap.has(key)) cellMap.set(key, []);
-      cellMap.get(key)!.push(item);
+  for (const group of withData) {
+    for (const slot of group.schedule_data!) {
+      usedDays.add(slot.day);
+      usedTimes.add(slot.time);
     }
   }
 
-  // Gruppi non parsati (schedule_description non riconoscibile)
-  const unparsed = parsed.filter((p) => !p.sched);
+  // Ordina secondo l'ordine canonico
+  const columns = DAY_ORDER.filter((d) => usedDays.has(d));
+  const rows    = [...usedTimes].sort(); // ordinamento lessicografico funziona per HH:MM
+
+  // Mappa  "giorno|orario" → lista di gruppi in quella cella
+  const cellMap = new Map<string, { group: Group; color: string }[]>();
+
+  withData.forEach((group, groupIndex) => {
+    const color = GROUP_COLORS[groupIndex % GROUP_COLORS.length];
+    for (const slot of group.schedule_data!) {
+      const key = `${slot.day}|${slot.time}`;
+      if (!cellMap.has(key)) cellMap.set(key, []);
+      cellMap.get(key)!.push({ group, color });
+    }
+  });
+
+  // ── Render ────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
       {/* Griglia */}
-      {columns.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-gray-400">
-          Nessun orario riconoscibile nelle schedule description dei gruppi.
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full text-sm border-collapse">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-500 w-20">Ora</th>
-                {columns.map((day) => (
-                  <th
-                    key={day}
-                    className="px-4 py-3 text-center font-semibold text-gray-700 min-w-[120px]"
-                  >
-                    {DAY_LABELS[day]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {hours.map((hour) => (
-                <tr key={hour} className="hover:bg-gray-50/50 transition-colors">
-                  {/* Colonna ora */}
-                  <td className="px-4 py-3 font-mono text-gray-500 font-medium whitespace-nowrap align-top">
-                    {String(hour).padStart(2, '0')}:00
-                  </td>
-                  {/* Celle giorno */}
-                  {columns.map((day) => {
-                    const key = `${hour}-${day}`;
-                    const items = cellMap.get(key) ?? [];
-                    return (
-                      <td key={day} className="px-2 py-2 align-top text-center">
-                        {items.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {items.map(({ group, color }) => (
-                              <div
-                                key={group.id}
-                                className={`
-                                  rounded-lg border px-2 py-1.5 text-xs font-bold
-                                  ${color}
-                                `}
-                              >
-                                🎾 {group.name}
-                                {group.schedule_description && (
-                                  <p className="font-normal text-[10px] mt-0.5 opacity-75">
-                                    {group.schedule_description}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-200 select-none">—</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="min-w-full text-sm border-collapse">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold text-slate-500 w-20 text-xs uppercase tracking-wider">
+                Ora
+              </th>
+              {columns.map((day) => (
+                <th
+                  key={day}
+                  className="px-4 py-3 text-center font-semibold text-slate-700 min-w-[130px] text-xs uppercase tracking-wider"
+                >
+                  {day}
+                </th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((time) => (
+              <tr key={time} className="hover:bg-slate-50/60 transition-colors">
+                {/* Colonna ora */}
+                <td className="px-4 py-3 font-mono text-slate-500 font-semibold text-sm align-top whitespace-nowrap">
+                  {time}
+                </td>
 
-      {/* Legenda gruppi */}
+                {/* Celle per ciascun giorno */}
+                {columns.map((day) => {
+                  const key   = `${day}|${time}`;
+                  const items = cellMap.get(key) ?? [];
+                  return (
+                    <td key={day} className="px-2 py-2 align-top text-center">
+                      {items.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {items.map(({ group, color }) => (
+                            <div
+                              key={group.id}
+                              className={`rounded-lg border px-2 py-2 text-xs font-bold ${color}`}
+                            >
+                              🎾 {group.name}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-200 select-none text-lg">·</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legenda */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-600 mb-2">Legenda gruppi</h3>
+        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+          Legenda gruppi
+        </h3>
         <div className="flex flex-wrap gap-2">
-          {parsed.map(({ group, color }) => (
+          {withData.map((group, i) => (
             <span
               key={group.id}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-semibold ${color}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-semibold ${GROUP_COLORS[i % GROUP_COLORS.length]}`}
             >
               🎾 {group.name}
-              {group.schedule_description && (
-                <span className="font-normal opacity-75">{group.schedule_description}</span>
+              {group.schedule_data && group.schedule_data.length > 0 && (
+                <span className="font-normal opacity-70">
+                  — {group.schedule_data.map((s) => `${s.day.slice(0, 3)} ${s.time}`).join(', ')}
+                </span>
               )}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Avvisi per gruppi con schedule non parsabile */}
-      {unparsed.length > 0 && (
-        <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-          <strong>⚠️ Gruppi con orario non riconosciuto:</strong>{' '}
-          {unparsed.map((p) => p.group.name).join(', ')}.{' '}
-          Verifica il formato del campo <code className="font-mono bg-yellow-100 px-1 rounded">schedule_description</code>{' '}
-          (esempio valido: <code className="font-mono bg-yellow-100 px-1 rounded">H 15:00 Lun-Mer</code>).
-        </div>
-      )}
+      {/* Avviso per gruppi senza schedule_data */}
+      {withoutData.length > 0 && <LegacyWarning groups={withoutData} />}
+    </div>
+  );
+}
+
+// ── Sotto-componente: avviso gruppi legacy ────────────────────
+
+function LegacyWarning({ groups }: { groups: Group[] }) {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <strong>⚠️ Gruppi senza orario strutturato:</strong>{' '}
+      {groups.map((g) => g.name).join(', ')}.{' '}
+      Vai in <strong>Gestione Gruppi</strong>, eliminali e ricrealì usando il selettore giorni/orari
+      per farli apparire nel calendario.
     </div>
   );
 }

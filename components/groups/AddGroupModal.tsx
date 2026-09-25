@@ -1,16 +1,36 @@
 'use client';
 
-import { useTransition, useRef, useEffect } from 'react';
+import { useTransition, useRef, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { createGroup } from '@/actions/groups';
+import type { ScheduleSlot } from '@/lib/types';
 
 interface AddGroupModalProps {
   onClose: () => void;
 }
 
+// ── Costanti ─────────────────────────────────────────────────
+
+const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'] as const;
+type Day = (typeof DAYS)[number];
+
+/** Orari comuni disponibili nel selettore */
+const TIME_OPTIONS = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00',
+];
+
+const DEFAULT_TIME = '15:00';
+
+// ── Componente principale ─────────────────────────────────────
+
 export default function AddGroupModal({ onClose }: AddGroupModalProps) {
   const [isPending, startTransition] = useTransition();
   const nameRef = useRef<HTMLInputElement>(null);
+
+  // Stato: Record<Day, orario selezionato> — solo i giorni attivi sono presenti
+  const [schedule, setSchedule] = useState<Partial<Record<Day, string>>>({});
 
   // Focus sul primo campo all'apertura
   useEffect(() => {
@@ -26,22 +46,41 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [isPending, onClose]);
 
+  // Toggle di un giorno: se è già attivo lo rimuove, altrimenti lo aggiunge con orario di default
+  function toggleDay(day: Day) {
+    setSchedule((prev) => {
+      const next = { ...prev };
+      if (day in next) {
+        delete next[day];
+      } else {
+        next[day] = DEFAULT_TIME;
+      }
+      return next;
+    });
+  }
+
+  function setTime(day: Day, time: string) {
+    setSchedule((prev) => ({ ...prev, [day]: time }));
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const data = new FormData(form);
-
-    const name = (data.get('name') as string).trim();
-    const schedule_description = (data.get('schedule_description') as string).trim();
+    const name = (new FormData(form).get('name') as string).trim();
 
     if (!name) {
       toast.error('Il nome del gruppo è obbligatorio');
       return;
     }
 
+    // Costruisce l'array in ordine canonico dei giorni
+    const schedule_data: ScheduleSlot[] = DAYS
+      .filter((day) => day in schedule)
+      .map((day) => ({ day, time: schedule[day]! }));
+
     startTransition(async () => {
       try {
-        await createGroup({ name, schedule_description });
+        await createGroup({ name, schedule_data });
         toast.success(`✅ Gruppo "${name.toUpperCase()}" creato!`);
         onClose();
       } catch (err) {
@@ -50,19 +89,21 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
     });
   }
 
+  const activeCount = Object.keys(schedule).length;
+
   return (
     /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={isPending ? undefined : onClose}
     >
-      {/* Pannello modale */}
+      {/* Pannello */}
       <div
-        className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <h2 className="text-lg font-bold text-slate-900">🎾 Nuovo Gruppo</h2>
           <button
             onClick={onClose}
@@ -70,72 +111,113 @@ export default function AddGroupModal({ onClose }: AddGroupModalProps) {
             aria-label="Chiudi"
             className="text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-40 p-1"
           >
-            {/* X icon */}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {/* Nome gruppo */}
-          <div>
-            <label className="label" htmlFor="group-name">
-              Nome Gruppo *
-            </label>
-            <input
-              ref={nameRef}
-              id="group-name"
-              name="name"
-              type="text"
-              required
-              placeholder="es. NADAL"
-              className="input"
-              disabled={isPending}
-            />
-            <p className="mt-1 text-xs text-slate-400">
-              Il nome verrà salvato in maiuscolo (es. SINNER, DJOKOVIC…)
-            </p>
-          </div>
+        {/* Body scrollabile */}
+        <div className="overflow-y-auto flex-1">
+          <form id="add-group-form" onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
 
-          {/* Orario */}
-          <div>
-            <label className="label" htmlFor="group-schedule">
-              Orario / Giorni
-            </label>
-            <input
-              id="group-schedule"
-              name="schedule_description"
-              type="text"
-              placeholder="es. H 15 LUN-MERC"
-              className="input"
-              disabled={isPending}
-            />
-            <p className="mt-1 text-xs text-slate-400">
-              Formato libero. Il Calendario lo interpreterà automaticamente.
-            </p>
-          </div>
+            {/* ── Nome ── */}
+            <div>
+              <label className="label" htmlFor="group-name">
+                Nome Gruppo *
+              </label>
+              <input
+                ref={nameRef}
+                id="group-name"
+                name="name"
+                type="text"
+                required
+                placeholder="es. NADAL"
+                className="input"
+                disabled={isPending}
+              />
+              <p className="mt-1 text-xs text-slate-400">Verrà salvato in maiuscolo</p>
+            </div>
 
-          {/* Footer */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isPending}
-              className="btn-secondary flex-1"
-            >
-              Annulla
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="btn-primary flex-1"
-            >
-              {isPending ? 'Salvataggio…' : '✅ Crea Gruppo'}
-            </button>
-          </div>
-        </form>
+            {/* ── Selettore giorni/orari ── */}
+            <div>
+              <p className="label mb-3">Giorni e Orari di Allenamento</p>
+
+              <div className="space-y-3">
+                {DAYS.map((day) => {
+                  const isActive = day in schedule;
+                  return (
+                    <div key={day} className="flex items-center gap-3">
+                      {/* Bottone giorno (toggle) */}
+                      <button
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        disabled={isPending}
+                        className={`
+                          w-28 shrink-0 rounded-lg px-3 py-2 text-sm font-semibold
+                          transition-all border disabled:opacity-40 text-left
+                          ${isActive
+                            ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-green-400 hover:text-green-700'
+                          }
+                        `}
+                      >
+                        {isActive ? '✓ ' : ''}{day}
+                      </button>
+
+                      {/* Selettore orario — visibile solo se il giorno è attivo */}
+                      {isActive && (
+                        <div className="flex items-center gap-2 animate-in fade-in duration-150">
+                          <select
+                            value={schedule[day]}
+                            onChange={(e) => setTime(day, e.target.value)}
+                            disabled={isPending}
+                            className="input py-2 w-28"
+                            aria-label={`Orario per ${day}`}
+                          >
+                            {TIME_OPTIONS.map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                          <span className="text-xs text-slate-400">
+                            {schedule[day]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {activeCount > 0 && (
+                <p className="mt-3 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
+                  📅 {activeCount} {activeCount === 1 ? 'giorno selezionato' : 'giorni selezionati'}:{' '}
+                  {DAYS.filter((d) => d in schedule).map((d) => `${d} ${schedule[d]}`).join(', ')}
+                </p>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* Footer sticky */}
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 shrink-0 bg-white">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPending}
+            className="btn-secondary flex-1"
+          >
+            Annulla
+          </button>
+          <button
+            type="submit"
+            form="add-group-form"
+            disabled={isPending}
+            className="btn-primary flex-1"
+          >
+            {isPending ? 'Salvataggio…' : '✅ Crea Gruppo'}
+          </button>
+        </div>
       </div>
     </div>
   );
